@@ -1,0 +1,21 @@
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: automation-rag-mcp
+    # environment:
+    #   - MILVUS_HOST=milvus
+    #   - MILVUS_PORT=19530
+    #   - NEO4J_URI=bolt://neo4j:7687
+    #   - OLLAMA_BASE_URL=http://ollama:11434
+    env_file:
+      - .env
+    ports:
+      - "8004:8004"
+    networks:
+      - rag_network
+
+networks:
+  rag_network:
+    external: true

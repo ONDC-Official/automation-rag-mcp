@@ -1,0 +1,27 @@
+[project]
+name = "automation-rag-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.135.3",
+    "fastmcp>=3.2.0",
+    "httpx>=0.28.1",
+    "langchain-core>=1.2.26",
+    "langchain-ollama>=1.1.0",
+    "langchain-tools>=0.1.34",
+    "mcp[cli]>=1.27.0",
+    "neo4j>=6.1.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "pymilvus>=2.6.11",
+    "python-dotenv>=1.2.2",
+    "uvicorn>=0.44.0",
+]
+
+[tool.uv.workspace]
+members = [
+    "rag-mcp",
+    "mcp_server",
+]
