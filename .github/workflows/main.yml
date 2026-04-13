@@ -1,0 +1,125 @@
+name: Deploy Automation RAG MCP
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: automation-rag-mcp-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://github.com/${{ github.repository }}
+
+    env:
+      REPO_DIR: /home/ubuntu/automation-rag-mcp
+      REPO_URL: https://github.com/${{ github.repository }}.git
+      COMPOSE_PROJECT_NAME: automation-rag-mcp
+      INGEST_MODE: ${{ vars.INGEST_MODE }}
+      MILVUS_HOST: ${{ vars.MILVUS_HOST }}
+      MILVUS_PORT: ${{ vars.MILVUS_PORT }}
+      NEO4J_URI: ${{ vars.NEO4J_URI }}
+      NEO4J_USER: ${{ vars.NEO4J_USER }}
+      NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+      OLLAMA_BASE_URL: ${{ vars.OLLAMA_BASE_URL }}
+      OLLAMA_CLOUD_URL: ${{ vars.OLLAMA_CLOUD_URL }}
+      OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+      EMBEDDING_MODEL: ${{ vars.EMBEDDING_MODEL }}
+      GENERATION_MODEL: ${{ vars.GENERATION_MODEL }}
+      DEFAULT_DOMAIN: ${{ vars.DEFAULT_DOMAIN }}
+      DEFAULT_API_VERSION: ${{ vars.DEFAULT_API_VERSION }}
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+
+    steps:
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
+          chmod 600 key.pem
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy on EC2
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NEO4J_PASSWORD}" ]; then
+            echo "NEO4J_PASSWORD secret is required."
+            exit 1
+          fi
+
+          if [[ "${GENERATION_MODEL:-}" == *cloud* ]] && [ -z "${OLLAMA_API_KEY}" ]; then
+            echo "OLLAMA_API_KEY secret is required when GENERATION_MODEL uses a cloud model."
+            exit 1
+          fi
+
+          ssh -i key.pem "${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}" <<EOF
+          set -euo pipefail
+
+          REPO_DIR="${REPO_DIR}"
+          REPO_URL="${REPO_URL}"
+          COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME}"
+
+          if [ ! -d "\$REPO_DIR" ]; then
+            echo "Repository not found at \$REPO_DIR. Cloning fresh copy."
+            git clone --single-branch --branch main "\$REPO_URL" "\$REPO_DIR"
+          elif [ ! -d "\$REPO_DIR/.git" ]; then
+            echo "\$REPO_DIR exists but is not a git repository."
+            exit 1
+          else
+            echo "Updating repository at \$REPO_DIR"
+            cd "\$REPO_DIR"
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+          fi
+
+          cd "\$REPO_DIR"
+
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "Docker is not installed on the EC2 instance."
+            exit 1
+          fi
+
+          if ! sudo docker compose version >/dev/null 2>&1; then
+            echo "Installing docker compose plugin."
+            sudo apt-get update
+            sudo apt-get install -y docker-compose-plugin
+          fi
+
+          sudo docker network inspect rag_network >/dev/null 2>&1 || sudo docker network create rag_network
+
+          cat > .env <<EOF_ENV
+          INGEST_MODE=${INGEST_MODE:-all}
+          MILVUS_HOST=${MILVUS_HOST:-milvus}
+          MILVUS_PORT=${MILVUS_PORT:-19530}
+          NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
+          NEO4J_USER=${NEO4J_USER:-neo4j}
+          NEO4J_PASSWORD=${NEO4J_PASSWORD}
+          OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+          OLLAMA_CLOUD_URL=${OLLAMA_CLOUD_URL:-https://ollama.com/v1}
+          OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
+          EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text-v2-moe}
+          GENERATION_MODEL=${GENERATION_MODEL:-qwen3-coder:480b-cloud}
+          DEFAULT_DOMAIN=${DEFAULT_DOMAIN:-ONDC:FIS12}
+          DEFAULT_API_VERSION=${DEFAULT_API_VERSION:-2.0.2}
+          LOG_LEVEL=${LOG_LEVEL:-INFO}
+          EOF_ENV
+
+          test -f .env
+          test -f docker-compose.yml
+
+          sudo docker compose -p "\$COMPOSE_PROJECT_NAME" down --remove-orphans || true
+          sudo docker compose -p "\$COMPOSE_PROJECT_NAME" up -d --build
+          sudo docker compose -p "\$COMPOSE_PROJECT_NAME" ps
+          EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f key.pem
