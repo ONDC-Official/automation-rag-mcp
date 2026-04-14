@@ -66,21 +66,20 @@ jobs:
           REPO_URL="${REPO_URL}"
           COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME}"
 
+          sudo mkdir -p "$(dirname "\$REPO_DIR")"
+
           if [ ! -d "\$REPO_DIR" ]; then
             echo "Repository not found at \$REPO_DIR. Cloning fresh copy."
-            git clone --single-branch --branch main "\$REPO_URL" "\$REPO_DIR"
+            sudo git clone --single-branch --branch main "\$REPO_URL" "\$REPO_DIR"
           elif [ ! -d "\$REPO_DIR/.git" ]; then
             echo "\$REPO_DIR exists but is not a git repository."
             exit 1
           else
             echo "Updating repository at \$REPO_DIR"
-            cd "\$REPO_DIR"
-            git fetch origin main
-            git checkout main
-            git pull --ff-only origin main
+            sudo git -C "\$REPO_DIR" fetch origin main
+            sudo git -C "\$REPO_DIR" checkout main
+            sudo git -C "\$REPO_DIR" pull --ff-only origin main
           fi
-
-          cd "\$REPO_DIR"
 
           if ! command -v docker >/dev/null 2>&1; then
             echo "Docker is not installed on the EC2 instance."
@@ -95,7 +94,7 @@ jobs:
 
           sudo docker network inspect rag_network >/dev/null 2>&1 || sudo docker network create rag_network
 
-          cat > .env <<EOF_ENV
+          sudo tee "\$REPO_DIR/.env" >/dev/null <<EOF_ENV
           INGEST_MODE=${INGEST_MODE:-all}
           MILVUS_HOST=${MILVUS_HOST:-milvus}
           MILVUS_PORT=${MILVUS_PORT:-19530}
@@ -108,16 +107,28 @@ jobs:
           EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text-v2-moe}
           GENERATION_MODEL=${GENERATION_MODEL:-qwen3-coder:480b-cloud}
           DEFAULT_DOMAIN=${DEFAULT_DOMAIN:-ONDC:FIS12}
-          DEFAULT_API_VERSION=${DEFAULT_API_VERSION:-2.0.2}
+          DEFAULT_API_VERSION=${DEFAULT_API_VERSION:-2.3.0}
           LOG_LEVEL=${LOG_LEVEL:-INFO}
           EOF_ENV
 
-          test -f .env
-          test -f docker-compose.yml
+          sudo test -f "\$REPO_DIR/.env"
+          sudo test -f "\$REPO_DIR/docker-compose.yml"
 
-          sudo docker compose -p "\$COMPOSE_PROJECT_NAME" down --remove-orphans || true
-          sudo docker compose -p "\$COMPOSE_PROJECT_NAME" up -d --build
-          sudo docker compose -p "\$COMPOSE_PROJECT_NAME" ps
+          sudo docker compose \
+            -p "\$COMPOSE_PROJECT_NAME" \
+            --env-file "\$REPO_DIR/.env" \
+            -f "\$REPO_DIR/docker-compose.yml" \
+            down --remove-orphans || true
+          sudo docker compose \
+            -p "\$COMPOSE_PROJECT_NAME" \
+            --env-file "\$REPO_DIR/.env" \
+            -f "\$REPO_DIR/docker-compose.yml" \
+            up -d --build
+          sudo docker compose \
+            -p "\$COMPOSE_PROJECT_NAME" \
+            --env-file "\$REPO_DIR/.env" \
+            -f "\$REPO_DIR/docker-compose.yml" \
+            ps
           EOF
 
       - name: Cleanup SSH key
