@@ -18,13 +18,13 @@ The server acts as a reasoning layer that combines semantic understanding with d
 graph TD
     User([User]) <--> Chatbot[ONDC Chatbot]
     Chatbot <-->|MCP Protocol / SSE| MCP[RAG MCP Server]
-    
+
     subgraph "Knowledge Layer"
         MCP <-->|Semantic Search| Milvus[(Milvus Vector DB)]
         MCP <-->|Structural Rules| Neo4j[(Neo4j Graph DB)]
         MCP <-->|Embeddings| Ollama[Ollama / Nomic]
     end
-    
+
     Milvus -.->|Contains| Docs[API Docs & MD Files]
     Neo4j -.->|Contains| Rules[Validation Rules & Enums]
 ```
@@ -39,20 +39,21 @@ graph TD
 
 The server exposes the following specialized tools to connected LLM clients:
 
-| Tool | Parameters | Description |
-| :--- | :--- | :--- |
-| `smart_search` | `query`, `limit`, `domain`, `version`, `action`, `query_from` | **Hybrid Search**: Searches both Milvus and Neo4j simultaneously and merges results. |
-| `discover_schema` | `query_from` (milvus/neo4j/all) | **Metadata Discovery**: Lists all available domains, versions, and API actions in the DB. |
-| `get_action_rules` | `action`, `domain`, `version`, `skip`, `limit` | **Rule Retrieval**: Finds all validation rules associated with a specific ONDC Action (e.g. `on_search`). |
-| `get_field_rules` | `jsonpath`, `domain`, `version`, `skip`, `limit` | **Impact Analysis**: Finds rules affecting a specific JSON path across the spec. |
-| `get_session_flow` | *None* | **State Tracing**: Returns the graph of how session tokens and keys move between actions. |
-| `get_cross_conflicts` | *None* | **Conflict Detection**: Identifies fields that have conflicting enum definitions across domains. |
+| Tool                  | Parameters                                                    | Description                                                                                               |
+| :-------------------- | :------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------- |
+| `smart_search`        | `query`, `limit`, `domain`, `version`, `action`, `query_from` | **Hybrid Search**: Searches both Milvus and Neo4j simultaneously and merges results.                      |
+| `discover_schema`     | `query_from` (milvus/neo4j/all)                               | **Metadata Discovery**: Lists all available domains, versions, and API actions in the DB.                 |
+| `get_action_rules`    | `action`, `domain`, `version`, `skip`, `limit`                | **Rule Retrieval**: Finds all validation rules associated with a specific ONDC Action (e.g. `on_search`). |
+| `get_field_rules`     | `jsonpath`, `domain`, `version`, `skip`, `limit`              | **Impact Analysis**: Finds rules affecting a specific JSON path across the spec.                          |
+| `get_session_flow`    | _None_                                                        | **State Tracing**: Returns the graph of how session tokens and keys move between actions.                 |
+| `get_cross_conflicts` | _None_                                                        | **Conflict Detection**: Identifies fields that have conflicting enum definitions across domains.          |
 
 ---
 
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
+
 - **Python 3.12+**
 - **uv** (Recommended for package management)
 - Access to:
@@ -61,6 +62,7 @@ The server exposes the following specialized tools to connected LLM clients:
   - **Ollama** (Embedding Engine)
 
 ### 2. Configuration
+
 Create a `.env` file in the root directory:
 
 ```env
@@ -77,13 +79,14 @@ EMBEDDING_MODEL=nomic-embed-text-v2-moe
 
 # Defaults
 DEFAULT_DOMAIN=ONDC:FIS12
-DEFAULT_API_VERSION=2.0.2
+DEFAULT_API_VERSION=2.3.0
 LOG_LEVEL=INFO
 ```
 
 ### 3. Installation & Run
 
 #### Using `uv` (Local Development)
+
 ```bash
 # Install dependencies
 uv sync
@@ -91,9 +94,11 @@ uv sync
 # Run the server
 uv run python main.py
 ```
+
 The server will be available at `http://localhost:8004/sse`.
 
 #### Using Docker
+
 ```bash
 # Ensure the external network exists
 docker network create rag_network || true
@@ -126,4 +131,5 @@ MCP_SERVER_URL=http://automation-rag-mcp:8004/sse
 ---
 
 ## 📄 License
+
 This project is part of the ONDC Automation Suite. Refer to the root repository for licensing information.

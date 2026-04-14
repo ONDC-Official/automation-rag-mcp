@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # ONDC domain
     default_domain: str = "ONDC:FIS12"
-    default_api_version: str = "2.0.2"
+    default_api_version: str = "2.3.0"
     retrieval_limit: int = 60
     query_from: str = "all"
 
