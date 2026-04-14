@@ -68,19 +68,6 @@ jobs:
 
           sudo mkdir -p "$(dirname "\$REPO_DIR")"
 
-          if [ ! -d "\$REPO_DIR" ]; then
-            echo "Repository not found at \$REPO_DIR. Cloning fresh copy."
-            sudo git clone --single-branch --branch main "\$REPO_URL" "\$REPO_DIR"
-          elif [ ! -d "\$REPO_DIR/.git" ]; then
-            echo "\$REPO_DIR exists but is not a git repository."
-            exit 1
-          else
-            echo "Updating repository at \$REPO_DIR"
-            sudo git -C "\$REPO_DIR" fetch origin main
-            sudo git -C "\$REPO_DIR" checkout main
-            sudo git -C "\$REPO_DIR" pull --ff-only origin main
-          fi
-
           if ! command -v docker >/dev/null 2>&1; then
             echo "Docker is not installed on the EC2 instance."
             exit 1
@@ -91,6 +78,25 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y docker-compose-plugin
           fi
+
+          if [ -f "\$REPO_DIR/docker-compose.yml" ] && [ -f "\$REPO_DIR/.env" ]; then
+            echo "Stopping existing deployment before rebuild."
+            sudo docker compose \
+              -p "\$COMPOSE_PROJECT_NAME" \
+              --env-file "\$REPO_DIR/.env" \
+              -f "\$REPO_DIR/docker-compose.yml" \
+              down --remove-orphans || true
+          elif [ -f "\$REPO_DIR/docker-compose.yml" ]; then
+            echo "Stopping existing deployment without .env file."
+            sudo docker compose \
+              -p "\$COMPOSE_PROJECT_NAME" \
+              -f "\$REPO_DIR/docker-compose.yml" \
+              down --remove-orphans || true
+          fi
+
+          echo "Rebuilding repository at \$REPO_DIR from origin/main"
+          sudo rm -rf "\$REPO_DIR"
+          sudo git clone --single-branch --branch main "\$REPO_URL" "\$REPO_DIR"
 
           sudo docker network inspect rag_network >/dev/null 2>&1 || sudo docker network create rag_network
 
