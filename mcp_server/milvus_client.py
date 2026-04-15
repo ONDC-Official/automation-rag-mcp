@@ -95,7 +95,7 @@ async def vector_search(
 ) -> List[VectorSearchResult]:
     """Search Milvus without blocking the Async Event Loop."""
     target_coll = collection_name or settings.dynamic_collection_name
-    # target_coll = f"ONDC_{target_coll}"
+    target_coll = f"ONDC_{target_coll}"
     log.info(
         f"MILVUS | Search: coll={target_coll} query='{query[:50]}...' top_k={top_k}"
     )
